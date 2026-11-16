@@ -66,3 +66,39 @@ Authorization: Bearer {{loginManager.response.body.$.token}}
 ### 9) Employee tries to approve: must be 403
 POST {{host}}/api/objectives/{{create.response.body.$.id}}/approve
 Authorization: Bearer {{login.response.body.$.token}}
+### 11) Manager lists his team members
+GET {{host}}/api/evaluations/team-members
+Authorization: Bearer {{loginManager.response.body.$.token}}
+
+### 12) Manager evaluates the employee (id 3)
+POST {{host}}/api/evaluations
+Authorization: Bearer {{loginManager.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "userId": 3,
+  "period": "2026 Q4",
+  "score": 85.5,
+  "comment": "Good progress on objectives"
+}
+
+### 13) Employee sees his evaluations: must be 200 with one item
+GET {{host}}/api/evaluations/mine
+Authorization: Bearer {{login.response.body.$.token}}
+
+### 14) Employee tries to create: must be 403
+POST {{host}}/api/evaluations
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{ "userId": 3, "period": "2026 Q4", "score": 90, "comment": "x" }
+
+### 15) Manager evaluates himself: must be 400
+POST {{host}}/api/evaluations
+Authorization: Bearer {{loginManager.response.body.$.token}}
+Content-Type: application/json
+
+{ "userId": 2, "period": "2026 Q4", "score": 90, "comment": "x" }
+### 16) Manager sees all objectives of his team: must be 200
+GET {{host}}/api/objectives/team
+Authorization: Bearer {{loginManager.response.body.$.token}}

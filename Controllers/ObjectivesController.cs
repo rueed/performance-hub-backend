@@ -164,6 +164,20 @@ public class ObjectivesController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(objective);
     }
+    [HttpGet("team")]
+    [Authorize(Roles = "Manager")]
+    public async Task<IActionResult> GetTeam()
+    {
+        var managerId = GetUserIdFromContext();
+
+        var list = await _context.Objectives
+            .Where(o => _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId))
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync();
+
+        return Ok(list);
+    }
+
 
     // Finds an objective only if its owner reports to this manager
     private async Task<Objective?> FindObjectiveOfMyTeam(int id, int managerId)
