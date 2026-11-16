@@ -1,14 +1,30 @@
 @host = https://localhost:7027
-### List my objectives
+
+### 1) Without token: must return 401
 GET {{host}}/api/objectives/mine
 
-### Create an objective
-POST {{host}}/api/objectives
+### 2) Login as employee
+# @name login
+POST {{host}}/api/auth/login
 Content-Type: application/json
 
 {
-  "title": "Learn React",
-  "description": "Finish the course",
+  "email": "employee@test.com",
+  "password": "Test@123"
+}
+
+### 3) With token: must return 200
+GET {{host}}/api/objectives/mine
+Authorization: Bearer {{login.response.body.$.token}}
+
+### 4) Create an objective with token
+POST {{host}}/api/objectives
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "title": "Learn JWT",
+  "description": "Understand how the token works",
   "startDate": "2026-11-16T00:00:00Z",
   "endDate": "2026-12-16T00:00:00Z"
 }

@@ -3,10 +3,12 @@ using PerformanceApi.Data;
 using PerformanceApi.Dtos;
 using PerformanceApi.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 namespace PerformanceApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ObjectivesController : ControllerBase
 {
     private readonly AppDbContext _context;//Dependency injection of the AppDbContext class, which is used to interact with the database. The _context variable is used to access the database and perform CRUD operations on the Objectives table.
@@ -99,8 +101,11 @@ public class ObjectivesController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(objective);
     }
-    private int GetUserIdFromContext() { 
-        return 1; // Replace with actual logic to retrieve the user ID from the authenticated user context
+    private int GetUserIdFromContext() {
+
+        var value = User.FindFirst("userId")?.Value;
+        return int.TryParse(value, out var id) ? id : 0;
+    
     }
 }
 
