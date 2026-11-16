@@ -5,6 +5,7 @@ namespace PerformanceApi.Data;
 
 public class AppDbContext : DbContext
 {
+
     // The constructor receives the options (database provider, connection string...)
     // from Program.cs and passes them to the base DbContext.
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
@@ -22,6 +23,10 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        // Ruaa: Score has up to 5 digits, 2 after the decimal point (e.g. 100.00)
+        modelBuilder.Entity<Evaluation>()
+            .Property(e => e.Score)
+            .HasPrecision(5, 2);
 
         modelBuilder.Entity<Department>(entity =>
         {
