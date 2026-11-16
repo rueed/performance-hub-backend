@@ -101,6 +101,77 @@ public class ObjectivesController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(objective);
     }
+    // GET api/objectives/pending  (a manager sees what his team submitted)
+    [HttpGet("pending")]
+    [Authorize(Roles = "Manager")]
+    public async Task<IActionResult> GetPending()
+    {
+        var managerId = GetUserIdFromContext();
+
+        var pending = await _context.Objectives
+            .Where(o => o.Status == ObjectiveStatus.PendingApproval
+                        && _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId))
+            .ToListAsync();
+
+        return Ok(pending);
+    }
+
+    // POST api/objectives/5/approve
+    [HttpPost("{id}/approve")]
+    [Authorize(Roles = "Manager")]
+    public async Task<IActionResult> Approve(int id)
+    {
+        var managerId = GetUserIdFromContext();
+        var objective = await FindObjectiveOfMyTeam(id, managerId);
+
+        if (objective == null)
+            return NotFound();
+
+        if (objective.Status != ObjectiveStatus.PendingApproval)
+            return BadRequest(new { title = "Only objectives waiting for approval can be approved" });
+
+        objective.Status = ObjectiveStatus.Approved;
+        objective.ReviewedByUserId = managerId;
+        objective.RejectionReason = null;
+        objective.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(objective);
+    }
+
+    // POST api/objectives/5/reject   body: { "reason": "..." }
+    [HttpPost("{id}/reject")]
+    [Authorize(Roles = "Manager")]
+    public async Task<IActionResult> Reject(int id, RejectObjectiveDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return BadRequest(new { title = "A rejection reason is required" });
+
+        var managerId = GetUserIdFromContext();
+        var objective = await FindObjectiveOfMyTeam(id, managerId);
+
+        if (objective == null)
+            return NotFound();
+
+        if (objective.Status != ObjectiveStatus.PendingApproval)
+            return BadRequest(new { title = "Only objectives waiting for approval can be rejected" });
+
+        objective.Status = ObjectiveStatus.Rejected;
+        objective.ReviewedByUserId = managerId;
+        objective.RejectionReason = dto.Reason.Trim();
+        objective.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(objective);
+    }
+
+    // Finds an objective only if its owner reports to this manager
+    private async Task<Objective?> FindObjectiveOfMyTeam(int id, int managerId)
+    {
+        return await _context.Objectives.FirstOrDefaultAsync(o =>
+            o.Id == id &&
+            _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId));
+    }
     private int GetUserIdFromContext() {
 
         var value = User.FindFirst("userId")?.Value;

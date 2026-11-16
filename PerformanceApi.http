@@ -28,3 +28,41 @@ Content-Type: application/json
   "startDate": "2026-11-16T00:00:00Z",
   "endDate": "2026-12-16T00:00:00Z"
 }
+### 5) Create + submit as employee
+# @name create
+POST {{host}}/api/objectives
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "title": "Needs approval",
+  "description": "test",
+  "startDate": "2026-11-16T00:00:00Z",
+  "endDate": "2026-12-16T00:00:00Z"
+}
+
+###
+POST {{host}}/api/objectives/{{create.response.body.$.id}}/submit
+Authorization: Bearer {{login.response.body.$.token}}
+
+### 6) Login as manager
+# @name loginManager
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@test.com",
+  "password": "Test@123"
+}
+
+### 7) Manager sees the pending list
+GET {{host}}/api/objectives/pending
+Authorization: Bearer {{loginManager.response.body.$.token}}
+
+### 8) Manager approves
+POST {{host}}/api/objectives/{{create.response.body.$.id}}/approve
+Authorization: Bearer {{loginManager.response.body.$.token}}
+
+### 9) Employee tries to approve: must be 403
+POST {{host}}/api/objectives/{{create.response.body.$.id}}/approve
+Authorization: Bearer {{login.response.body.$.token}}
