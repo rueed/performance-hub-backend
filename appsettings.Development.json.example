@@ -1,5 +1,10 @@
 {
   "ConnectionStrings": {
     "DefaultConnection": "Server=(localdb)\\MSSQLLocalDB;Database=PerformanceDb;Trusted_Connection=True;TrustServerCertificate=True"
+  },
+  "Jwt": {
+    "Key": "REPLACE-WITH-YOUR-OWN-SECRET-KEY-AT-LEAST-32-CHARS",
+    "Issuer": "PerformanceApi",
+    "Audience": "PerformanceApiClient"
   }
 }
