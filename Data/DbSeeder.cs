@@ -8,52 +8,152 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(AppDbContext db)
     {
-        // If there are already users, do nothing (so it never runs twice)
-        if (await db.Users.AnyAsync()) return;
-
         var hasher = new PasswordHasher<User>();
-        const string password = "Test@123"; // development only
+        const string password = "Test@123"; // Development only
 
-        // 1) Departments
-        var it = new Department { Name = "IT" };
-        var hrDept = new Department { Name = "HR" };
-        db.Departments.AddRange(it, hrDept);
-        await db.SaveChangesAsync();
+        // 1. Ensure departments exist
+        var it = await db.Departments
+            .FirstOrDefaultAsync(d => d.Name == "IT");
 
-        // 2) HR user and Manager user
-        var hr = new User
+        if (it == null)
         {
-            FullName = "HR Test",
-            Email = "hr@test.com",
-            Role = Role.HR,
-            DepartmentId = hrDept.Id
-        };
-        hr.PasswordHash = hasher.HashPassword(hr, password);
+            it = new Department { Name = "IT" };
+            db.Departments.Add(it);
+            await db.SaveChangesAsync();
+        }
 
-        var manager = new User
+        var hrDept = await db.Departments
+            .FirstOrDefaultAsync(d => d.Name == "HR");
+
+        if (hrDept == null)
         {
-            FullName = "Manager Test",
-            Email = "manager@test.com",
-            Role = Role.Manager,
-            DepartmentId = it.Id
-        };
-        manager.PasswordHash = hasher.HashPassword(manager, password);
+            hrDept = new Department { Name = "HR" };
+            db.Departments.Add(hrDept);
+            await db.SaveChangesAsync();
+        }
 
-        db.Users.AddRange(hr, manager);
-        await db.SaveChangesAsync();
-
-        // 3) Employee (his manager is the manager above)
-        var employee = new User
+        // 2. Create or update a demo user
+        async Task<User> EnsureUser(
+            string email,
+            string fullName,
+            Role role,
+            int departmentId,
+            int? managerId = null,
+            string? oldEmail = null)
         {
-            FullName = "Employee Test",
-            Email = "employee@test.com",
-            Role = Role.Employee,
-            DepartmentId = it.Id,
-            ManagerId = manager.Id
-        };
-        employee.PasswordHash = hasher.HashPassword(employee, password);
+            var user = await db.Users
+                .FirstOrDefaultAsync(u => u.Email == email);
 
-        db.Users.Add(employee);
-        await db.SaveChangesAsync();
+            // Find an existing legacy demo account
+            if (user == null && oldEmail != null)
+            {
+                user = await db.Users
+                    .FirstOrDefaultAsync(u => u.Email == oldEmail);
+            }
+
+            if (user == null)
+            {
+                user = new User
+                {
+                    FullName = fullName,
+                    Email = email,
+                    Role = role,
+                    DepartmentId = departmentId,
+                    ManagerId = managerId,
+                    IsActive = true
+                };
+
+                user.PasswordHash =
+                    hasher.HashPassword(user, password);
+
+                db.Users.Add(user);
+            }
+            else
+            {
+                // Update only the designated demo account
+                user.FullName = fullName;
+                user.Email = email;
+                user.Role = role;
+                user.DepartmentId = departmentId;
+                user.ManagerId = managerId;
+            }
+
+            await db.SaveChangesAsync();
+
+            return user;
+        }
+
+        // 3. HR users
+        await EnsureUser(
+            "sarah.ahmad@test.com",
+            "Sarah Ahmad",
+            Role.HR,
+            hrDept.Id,
+            oldEmail: "hr@test.com");
+
+        await EnsureUser(
+            "lina.khaled@test.com",
+            "Lina Khaled",
+            Role.HR,
+            hrDept.Id);
+
+        // 4. Managers (their actual Role is Employee)
+        var omar = await EnsureUser(
+            "omar.hassan@test.com",
+            "Omar Hassan",
+            Role.Employee,
+            it.Id,
+            oldEmail: "manager@test.com");
+
+        var ahmad = await EnsureUser(
+            "ahmad.saleh@test.com",
+            "Ahmad Saleh",
+            Role.Employee,
+            it.Id);
+
+        // 5. Omar's employees
+        await EnsureUser(
+            "yazan.ali@test.com",
+            "Yazan Ali",
+            Role.Employee,
+            it.Id,
+            omar.Id,
+            oldEmail: "employee@test.com");
+
+        await EnsureUser(
+            "rawan.mahmoud@test.com",
+            "Rawan Mahmoud",
+            Role.Employee,
+            it.Id,
+            omar.Id);
+
+        await EnsureUser(
+            "yousef.ibrahim@test.com",
+            "Yousef Ibrahim",
+            Role.Employee,
+            it.Id,
+            omar.Id);
+
+        // 6. Ahmad's employees
+        await EnsureUser(
+            "dana.nasser@test.com",
+            "Dana Nasser",
+            Role.Employee,
+            it.Id,
+            ahmad.Id);
+
+        await EnsureUser(
+            "kareem.sami@test.com",
+            "Kareem Sami",
+            Role.Employee,
+            it.Id,
+            ahmad.Id);
+
+        await EnsureUser(
+            "noor.adel@test.com",
+            "Noor Adel",
+            Role.Employee,
+            it.Id,
+            ahmad.Id);
     }
 }

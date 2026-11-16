@@ -23,53 +23,64 @@ public class AuthController : ControllerBase
         _tokens = tokens;
     }
 
-    // POST /api/auth/login
+    // Login
     [HttpPost("login")]
     public async Task<ActionResult<LoginResponseDto>> Login(LoginRequestDto request)
     {
         var user = await _db.Users
             .FirstOrDefaultAsync(u => u.Email == request.Email.Trim());
 
-        // Same message for "no such user" and "wrong password" (don't reveal which)
-        if (user is null || !user.IsActive)
-            return Unauthorized(new ProblemDetails { Title = "Invalid email or password", Status = 401 });
+        if (user == null || !user.IsActive)
+            return Unauthorized("Invalid email or password");
 
-        var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+        var result = _hasher.VerifyHashedPassword(
+            user, user.PasswordHash, request.Password);
+
         if (result == PasswordVerificationResult.Failed)
-            return Unauthorized(new ProblemDetails { Title = "Invalid email or password", Status = 401 });
+            return Unauthorized("Invalid email or password");
 
         return Ok(new LoginResponseDto
         {
             Token = _tokens.CreateToken(user),
-            User = ToDto(user)
+            User = await ToDtoAsync(user)
         });
     }
 
-    // GET /api/auth/me
+    // Get current user
     [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<UserDto>> Me()
     {
-        // Read the id from the token, never from the client
-        var idClaim = User.FindFirst("userId")?.Value;
-        if (!int.TryParse(idClaim, out var userId))
+        var id = User.FindFirst("userId")?.Value;
+
+        if (!int.TryParse(id, out int userId))
             return Unauthorized();
 
         var user = await _db.Users.FindAsync(userId);
-        if (user is null || !user.IsActive)
+
+        if (user == null || !user.IsActive)
             return Unauthorized();
 
-        return Ok(ToDto(user));
+        return Ok(await ToDtoAsync(user));
     }
 
-    private static UserDto ToDto(User user) => new()
+    // Convert User to UserDto
+    private async Task<UserDto> ToDtoAsync(User user)
     {
-        Id = user.Id,
-        FullName = user.FullName,
-        Email = user.Email,
-        Role = user.Role,
-        DepartmentId = user.DepartmentId,
-        ManagerId = user.ManagerId,
-        IsActive = user.IsActive
-    };
+        bool isManager = user.Role == Role.Employee &&
+            await _db.Users.AnyAsync(u =>
+                u.ManagerId == user.Id && u.IsActive);
+
+        return new UserDto
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role,
+            DepartmentId = user.DepartmentId,
+            ManagerId = user.ManagerId,
+            IsActive = user.IsActive,
+            IsManager = isManager
+        };
+    }
 }

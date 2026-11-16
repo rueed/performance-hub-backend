@@ -2,7 +2,7 @@
 
 public enum Role
 {
-    Employee,
-    Manager,
-    HR
+    Employee = 0,
+    Manager = 1, // مؤقتاً للتوافق مع البيانات القديمة
+    HR = 2
 }
