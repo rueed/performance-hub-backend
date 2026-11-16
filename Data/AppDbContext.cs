@@ -3,14 +3,18 @@ using PerformanceApi.Models;
 
 namespace PerformanceApi.Data;
 
-// The single DbContext of the project. Each teammate adds her own DbSet lines,
-// for example:
-//   public DbSet<Objective> Objectives => Set<Objective>();
 public class AppDbContext : DbContext
 {
+
+    // The constructor receives the options (database provider, connection string...)
+    // from Program.cs and passes them to the base DbContext.
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
+
+    // Ruaa: Objectives and Evaluations
+    public DbSet<Objective> Objectives { get; set; }
+    public DbSet<Evaluation> Evaluations { get; set; }
 
     // Jana: Users and Departments
     public DbSet<User> Users => Set<User>();
@@ -19,6 +23,10 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        // Ruaa: Score has up to 5 digits, 2 after the decimal point (e.g. 100.00)
+        modelBuilder.Entity<Evaluation>()
+            .Property(e => e.Score)
+            .HasPrecision(5, 2);
 
         modelBuilder.Entity<Department>(entity =>
         {

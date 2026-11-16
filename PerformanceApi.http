@@ -1,6 +1,14 @@
-@PerformanceApi_HostAddress = http://localhost:5126
+@host = https://localhost:7027
+### List my objectives
+GET {{host}}/api/objectives/mine
 
-GET {{PerformanceApi_HostAddress}}/weatherforecast/
-Accept: application/json
+### Create an objective
+POST {{host}}/api/objectives
+Content-Type: application/json
 
-###
+{
+  "title": "Learn React",
+  "description": "Finish the course",
+  "startDate": "2026-11-16T00:00:00Z",
+  "endDate": "2026-12-16T00:00:00Z"
+}
