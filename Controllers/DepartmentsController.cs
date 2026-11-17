@@ -27,9 +27,9 @@ public class DepartmentsController : ControllerBase
         return Ok(departments);
     }
 
-    // 2. HR: Create a department
+    // 2. Admin: Create a department
     [HttpPost]
-    [Authorize(Roles = "HR")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create(Department department)
     {
         if (string.IsNullOrWhiteSpace(department.Name))
@@ -51,7 +51,7 @@ public class DepartmentsController : ControllerBase
 
     // 3. HR: Update a department
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "HR")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, Department updated)
     {
         var department = await _db.Departments.FindAsync(id);

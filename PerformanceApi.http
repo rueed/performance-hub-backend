@@ -112,3 +112,13 @@ Content-Type: application/json
 ### Get all departments
 GET {{host}}/api/departments
 Authorization: Bearer {{hrToken}}
+
+
+  ### Create Department
+POST {{host}}/api/departments
+Authorization: Bearer {{hrToken}}
+Content-Type: application/json
+
+{
+  "name": "Finance"
+}
