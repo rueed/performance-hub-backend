@@ -2,7 +2,6 @@
 
 public enum Role
 {
-    Employee,
-    Manager,
-    HR
+    Employee = 0,
+    Admin = 2
 }

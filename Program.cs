@@ -32,8 +32,11 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
+
+
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
@@ -42,7 +45,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
-            RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+            RoleClaimType = "role",
             NameClaimType = "userId"
         };
     });
@@ -53,15 +56,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("Manager", policy =>
         policy.RequireAuthenticatedUser()
               .AddRequirements(new PerformanceApi.Authorization.ManagerRequirement()));
-}); builder.Services.AddOpenApi();
+});
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
-if (app.Environment.IsDevelopment())
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DbSeeder.SeedAsync(db);
-}
 
 if (app.Environment.IsDevelopment())
 {
