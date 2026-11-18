@@ -3,10 +3,12 @@ using PerformanceApi.Data;
 using PerformanceApi.Dtos;
 using PerformanceApi.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 namespace PerformanceApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ObjectivesController : ControllerBase
 {
     private readonly AppDbContext _context;//Dependency injection of the AppDbContext class, which is used to interact with the database. The _context variable is used to access the database and perform CRUD operations on the Objectives table.
@@ -99,8 +101,96 @@ public class ObjectivesController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(objective);
     }
-    private int GetUserIdFromContext() { 
-        return 1; // Replace with actual logic to retrieve the user ID from the authenticated user context
+    // GET api/objectives/pending  (a manager sees what his team submitted)
+    [HttpGet("pending")]
+    [Authorize(Policy = "Manager")]
+    public async Task<IActionResult> GetPending()
+    {
+        var managerId = GetUserIdFromContext();
+
+        var pending = await _context.Objectives
+            .Where(o => o.Status == ObjectiveStatus.PendingApproval
+                        && _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId))
+            .ToListAsync();
+
+        return Ok(pending);
+    }
+
+    // POST api/objectives/5/approve
+    [HttpPost("{id}/approve")]
+    [Authorize(Policy = "Manager")]
+    public async Task<IActionResult> Approve(int id)
+    {
+        var managerId = GetUserIdFromContext();
+        var objective = await FindObjectiveOfMyTeam(id, managerId);
+
+        if (objective == null)
+            return NotFound();
+
+        if (objective.Status != ObjectiveStatus.PendingApproval)
+            return BadRequest(new { title = "Only objectives waiting for approval can be approved" });
+
+        objective.Status = ObjectiveStatus.Approved;
+        objective.ReviewedByUserId = managerId;
+        objective.RejectionReason = null;
+        objective.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(objective);
+    }
+
+    // POST api/objectives/5/reject   body: { "reason": "..." }
+    [HttpPost("{id}/reject")]
+    [Authorize(Policy = "Manager")]
+    public async Task<IActionResult> Reject(int id, RejectObjectiveDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return BadRequest(new { title = "A rejection reason is required" });
+
+        var managerId = GetUserIdFromContext();
+        var objective = await FindObjectiveOfMyTeam(id, managerId);
+
+        if (objective == null)
+            return NotFound();
+
+        if (objective.Status != ObjectiveStatus.PendingApproval)
+            return BadRequest(new { title = "Only objectives waiting for approval can be rejected" });
+
+        objective.Status = ObjectiveStatus.Rejected;
+        objective.ReviewedByUserId = managerId;
+        objective.RejectionReason = dto.Reason.Trim();
+        objective.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(objective);
+    }
+    [HttpGet("team")]
+    [Authorize(Policy = "Manager")]
+    public async Task<IActionResult> GetTeam()
+    {
+        var managerId = GetUserIdFromContext();
+
+        var list = await _context.Objectives
+            .Where(o => _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId))
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync();
+
+        return Ok(list);
+    }
+
+
+    // Finds an objective only if its owner reports to this manager
+    private async Task<Objective?> FindObjectiveOfMyTeam(int id, int managerId)
+    {
+        return await _context.Objectives.FirstOrDefaultAsync(o =>
+            o.Id == id &&
+            _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId));
+    }
+    private int GetUserIdFromContext() {
+
+        var value = User.FindFirst("userId")?.Value;
+        return int.TryParse(value, out var id) ? id : 0;
+    
     }
 }
 

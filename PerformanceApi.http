@@ -1,14 +1,124 @@
-@host = https://localhost:7027
-### List my objectives
-GET {{host}}/api/objectives/mine
-
-### Create an objective
-POST {{host}}/api/objectives
+  @host = https://localhost:7027
+  @omarToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJQZXJmb3JtYW5jZUFwaUNsaWVudCIsImlzcyI6IlBlcmZvcm1hbmNlQXBpIiwiZXhwIjoxNzk0ODc4MDE5LCJ1c2VySWQiOiIyIiwicm9sZSI6IkVtcGxveWVlIiwiZGVwYXJ0bWVudElkIjoiMSIsImlhdCI6MTc5NDg0OTIxOSwibmJmIjoxNzk0ODQ5MjE5fQ.k8ZoOZVMhZkJRdrS2naXN_sbQMkB4FikBLH_bn1xcvM
+  @yazanToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJQZXJmb3JtYW5jZUFwaUNsaWVudCIsImlzcyI6IlBlcmZvcm1hbmNlQXBpIiwiZXhwIjoxNzk0ODc4MzQwLCJ1c2VySWQiOiIzIiwicm9sZSI6IkVtcGxveWVlIiwiZGVwYXJ0bWVudElkIjoiMSIsImlhdCI6MTc5NDg0OTU0MCwibmJmIjoxNzk0ODQ5NTQwfQ.OJwIVpqezu6yYR7i3oCC740FtcPI8sl0J81IsQIBnWg
+    @hrToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJQZXJmb3JtYW5jZUFwaUNsaWVudCIsImlzcyI6IlBlcmZvcm1hbmNlQXBpIiwiZXhwIjoxNzk0ODc4NjU2LCJ1c2VySWQiOiIxIiwicm9sZSI6IkhSIiwiZGVwYXJ0bWVudElkIjoiMiIsImlhdCI6MTc5NDg0OTg1NiwibmJmIjoxNzk0ODQ5ODU2fQ.CbcQ6KSQ14lgIKMMxojJmEGed4wYV71nqYx8CejKBDo 
+     
+     POST {{host}}/api/auth/login
 Content-Type: application/json
 
 {
-  "title": "Learn React",
-  "description": "Finish the course",
-  "startDate": "2026-11-16T00:00:00Z",
-  "endDate": "2026-12-16T00:00:00Z"
+  "email": "sarah.ahmad@test.com",
+  "password": "Test@123"
+}
+
+
+### Login as Omar
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "omar.hassan@test.com",
+  "password": "Test@123"
+}
+
+
+### Login as Omar
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "omar.hassan@test.com",
+  "password": "Test@123"
+}
+
+### Get Omar's Team
+GET {{host}}/api/users/my-team
+Authorization: Bearer {{omarToken}}
+
+### Login as Yazan
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "yazan.ali@test.com",
+  "password": "Test@123"
+}
+
+
+### Employee without a team
+GET {{host}}/api/users/my-team
+Authorization: Bearer {{yazanToken}}
+ 
+
+
+### Login as Sarah HR
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "sarah.ahmad@test.com",
+  "password": "Test@123"
+}
+
+  ### Create new employee as HR
+POST {{host}}/api/users
+Authorization: Bearer {{hrToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Khaled Mansour",
+  "email": "khaled.mansour@test.com",
+  "password": "Test@123",
+  "role": "Employee",
+  "departmentId": 1,
+  "managerId": 2
+}
+
+### Get all users as HR
+GET {{host}}/api/users
+Authorization: Bearer {{hrToken}}
+
+
+
+### Update Khaled as HR
+PUT {{host}}/api/users/14
+Authorization: Bearer {{hrToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Khaled Ahmad Mansour",
+  "email": "khaled.mansour@test.com",
+  "role": "Employee",
+  "departmentId": 1,
+  "managerId": 2,
+  "isActive": true
+}
+
+  ### Deactivate Khaled
+DELETE {{host}}/api/users/14
+Authorization: Bearer {{hrToken}}
+
+
+  ### Login with deactivated account
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "khaled.mansour@test.com",
+  "password": "Test@123"
+}
+
+
+### Get all departments
+GET {{host}}/api/departments
+Authorization: Bearer {{hrToken}}
+
+
+  ### Create Department
+POST {{host}}/api/departments
+Authorization: Bearer {{hrToken}}
+Content-Type: application/json
+
+{
+  "name": "Finance"
 }

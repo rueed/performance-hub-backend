@@ -11,4 +11,6 @@ public class UserDto
     public int DepartmentId { get; set; }
     public int? ManagerId { get; set; }
     public bool IsActive { get; set; }
+
+    public bool IsManager { get; set; }
 }
