@@ -28,7 +28,7 @@ public class EvaluationsController : ControllerBase
 
     // GET api/evaluations/team-members  (a manager sees who he can evaluate)
     [HttpGet("team-members")]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Policy = "Manager")]
     public async Task<IActionResult> GetTeamMembers()
     {
         var managerId = GetUserIdFromContext();
@@ -43,7 +43,7 @@ public class EvaluationsController : ControllerBase
 
     // POST api/evaluations  (a manager evaluates one of his team members)
     [HttpPost]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Policy = "Manager")]
     public async Task<IActionResult> Create(CreateEvaluationDto dto)
     {
         var managerId = GetUserIdFromContext();
@@ -92,7 +92,7 @@ public class EvaluationsController : ControllerBase
 
     // GET api/evaluations/team  (a manager sees the evaluations he wrote)
     [HttpGet("team")]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Policy = "Manager")]
     public async Task<IActionResult> GetTeam()
     {
         var managerId = GetUserIdFromContext();

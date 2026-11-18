@@ -1,10 +1,11 @@
-using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
-using PerformanceApi.Data;
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using PerformanceApi.Data;
 using PerformanceApi.Services;
+using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,8 +47,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
-builder.Services.AddOpenApi();
+builder.Services.AddScoped<IAuthorizationHandler, PerformanceApi.Authorization.ManagerHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Manager", policy =>
+        policy.RequireAuthenticatedUser()
+              .AddRequirements(new PerformanceApi.Authorization.ManagerRequirement()));
+}); builder.Services.AddOpenApi();
 
 var app = builder.Build();
 if (app.Environment.IsDevelopment())

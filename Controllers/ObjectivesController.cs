@@ -103,7 +103,7 @@ public class ObjectivesController : ControllerBase
     }
     // GET api/objectives/pending  (a manager sees what his team submitted)
     [HttpGet("pending")]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Policy = "Manager")]
     public async Task<IActionResult> GetPending()
     {
         var managerId = GetUserIdFromContext();
@@ -118,7 +118,7 @@ public class ObjectivesController : ControllerBase
 
     // POST api/objectives/5/approve
     [HttpPost("{id}/approve")]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Policy = "Manager")]
     public async Task<IActionResult> Approve(int id)
     {
         var managerId = GetUserIdFromContext();
@@ -141,7 +141,7 @@ public class ObjectivesController : ControllerBase
 
     // POST api/objectives/5/reject   body: { "reason": "..." }
     [HttpPost("{id}/reject")]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Policy = "Manager")]
     public async Task<IActionResult> Reject(int id, RejectObjectiveDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.Reason))
@@ -165,7 +165,7 @@ public class ObjectivesController : ControllerBase
         return Ok(objective);
     }
     [HttpGet("team")]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Policy = "Manager")]
     public async Task<IActionResult> GetTeam()
     {
         var managerId = GetUserIdFromContext();
