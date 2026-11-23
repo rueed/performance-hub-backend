@@ -13,7 +13,7 @@ public class ObjectivesController : ControllerBase
 {
     private readonly AppDbContext _context;//Dependency injection of the AppDbContext class, which is used to interact with the database. The _context variable is used to access the database and perform CRUD operations on the Objectives table.
 
-    private const int MaxObjectives = 3; // each employee can have at most 3 objectives
+    private const int MinObjectives = 3; // an employee must submit at least 3 objectives together
     public ObjectivesController(AppDbContext context)// Dependency injection
     {
         _context = context;
@@ -25,16 +25,11 @@ public class ObjectivesController : ControllerBase
     {
         var userId = GetUserIdFromContext();
 
-        // Rule 1: once something was submitted, no new objectives
+        // once something was submitted, no new objectives
         var alreadySubmitted = await _context.Objectives
             .AnyAsync(o => o.UserId == userId && o.Status != ObjectiveStatus.Draft);
         if (alreadySubmitted)
             return BadRequest(new { title = "You already submitted your objectives, so you cannot add new ones" });
-
-        // Rule 2: at most 3 objectives in total
-        var count = await _context.Objectives.CountAsync(o => o.UserId == userId);
-        if (count >= MaxObjectives)
-            return BadRequest(new { title = $"You can have at most {MaxObjectives} objectives" });
 
         var objective = new Objective
         {
@@ -87,21 +82,20 @@ public class ObjectivesController : ControllerBase
         return Ok(objectives);
     }
     // POST api/objectives/5/submit
-    [HttpPost("{id}/submit")]//routing
+    // Only for a REJECTED objective (edit it, then send it again on its own).
+    [HttpPost("{id}/submit")]
     public async Task<IActionResult> Submit(int id)
     {
         var userId = GetUserIdFromContext();
 
-        // بدور بس بين objectives المستخدم نفسه (مش أي واحد)
         var objective = await _context.Objectives
             .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
 
         if (objective == null)
             return NotFound();
 
-        if (objective.Status != ObjectiveStatus.Draft &&
-            objective.Status != ObjectiveStatus.Rejected)
-            return BadRequest(new { title = "Only Draft or Rejected objectives can be submitted" });
+        if (objective.Status != ObjectiveStatus.Rejected)
+            return BadRequest(new { title = "Only a rejected objective can be sent again on its own" });
 
         objective.Status = ObjectiveStatus.PendingApproval;
         objective.RejectionReason = null;
@@ -109,6 +103,44 @@ public class ObjectivesController : ControllerBase
 
         await _context.SaveChangesAsync();
         return Ok(objective);
+    }
+
+    // POST api/objectives/submit-drafts
+    // Sends ALL my draft objectives to the manager together (at least 3).
+    // POST api/objectives/submit-drafts   body: { "ids": [1, 2, 3] }
+    // Sends the chosen draft objectives to the manager together (at least 3).
+    // Drafts that are not in the list stay as drafts.
+    [HttpPost("submit-drafts")]
+    public async Task<IActionResult> SubmitDrafts(SubmitObjectivesDto dto)
+    {
+        var userId = GetUserIdFromContext();
+
+        var alreadySubmitted = await _context.Objectives
+            .AnyAsync(o => o.UserId == userId && o.Status != ObjectiveStatus.Draft);
+        if (alreadySubmitted)
+            return BadRequest(new { title = "You already submitted your objectives" });
+
+        var ids = dto.Ids.Distinct().ToList();
+        if (ids.Count < MinObjectives)
+            return BadRequest(new { title = $"You need at least {MinObjectives} objectives to submit" });
+
+        // only my own objectives (all of them are drafts, checked above)
+        var chosen = await _context.Objectives
+            .Where(o => o.UserId == userId && ids.Contains(o.Id))
+            .ToListAsync();
+
+        if (chosen.Count != ids.Count)
+            return BadRequest(new { title = "Some of the objectives were not found" });
+
+        foreach (var objective in chosen)
+        {
+            objective.Status = ObjectiveStatus.PendingApproval;
+            objective.RejectionReason = null;
+            objective.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(chosen);
     }
 
     // PATCH api/objectives/5/progress
