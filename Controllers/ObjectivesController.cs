@@ -11,15 +11,17 @@ namespace PerformanceApi.Controllers;
 [Authorize]
 public class ObjectivesController : ControllerBase
 {
-    private readonly AppDbContext _context;//Dependency injection of the AppDbContext class, which is used to interact with the database. The _context variable is used to access the database and perform CRUD operations on the Objectives table.
+    // Dependency injection of the AppDbContext: it is used to read and write the Objectives table.
+    private readonly AppDbContext _context;
 
     private const int MinObjectives = 3; // an employee must submit at least 3 objectives together
-    public ObjectivesController(AppDbContext context)// Dependency injection
+
+    public ObjectivesController(AppDbContext context)
     {
         _context = context;
-
     }
 
+    // POST api/objectives   (creates a Draft objective)
     [HttpPost]
     public async Task<IActionResult> Create(CreateObjectiveDto dto)
     {
@@ -74,6 +76,7 @@ public class ObjectivesController : ControllerBase
         return Ok(objective);
     }
 
+    // GET api/objectives/mine
     [HttpGet("mine")]
     public async Task<IActionResult> GetMine()
     {
@@ -81,32 +84,7 @@ public class ObjectivesController : ControllerBase
         var objectives = await _context.Objectives.Where(o => o.UserId == userId).ToListAsync();
         return Ok(objectives);
     }
-    // POST api/objectives/5/submit
-    // Only for a REJECTED objective (edit it, then send it again on its own).
-    [HttpPost("{id}/submit")]
-    public async Task<IActionResult> Submit(int id)
-    {
-        var userId = GetUserIdFromContext();
 
-        var objective = await _context.Objectives
-            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
-
-        if (objective == null)
-            return NotFound();
-
-        if (objective.Status != ObjectiveStatus.Rejected)
-            return BadRequest(new { title = "Only a rejected objective can be sent again on its own" });
-
-        objective.Status = ObjectiveStatus.PendingApproval;
-        objective.RejectionReason = null;
-        objective.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-        return Ok(objective);
-    }
-
-    // POST api/objectives/submit-drafts
-    // Sends ALL my draft objectives to the manager together (at least 3).
     // POST api/objectives/submit-drafts   body: { "ids": [1, 2, 3] }
     // Sends the chosen draft objectives to the manager together (at least 3).
     // Drafts that are not in the list stay as drafts.
@@ -143,97 +121,32 @@ public class ObjectivesController : ControllerBase
         return Ok(chosen);
     }
 
-    // PATCH api/objectives/5/progress
-    [HttpPatch("{id}/progress")]
-    public async Task<IActionResult> UpdateProgress(int id, UpdateProgressDto dto)
+    // POST api/objectives/resubmit-rejected
+    // The employee sends ALL his rejected objectives again (after editing them).
+    [HttpPost("resubmit-rejected")]
+    public async Task<IActionResult> ResubmitRejected()
     {
         var userId = GetUserIdFromContext();
 
-        var objective = await _context.Objectives
-            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
-
-        if (objective == null)
-            return NotFound();
-
-        if (objective.Status != ObjectiveStatus.Approved &&
-            objective.Status != ObjectiveStatus.InProgress)
-            return BadRequest(new { title = "Progress can only be updated on approved objectives" });
-
-        if (dto.Progress < 0 || dto.Progress > 100)
-            return BadRequest(new { title = "Progress must be between 0 and 100" });
-
-        objective.Progress = dto.Progress;
-        objective.Status = dto.Progress == 100
-            ? ObjectiveStatus.Completed
-            : ObjectiveStatus.InProgress;
-        objective.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-        return Ok(objective);
-    }
-    // GET api/objectives/pending  (a manager sees what his team submitted)
-    [HttpGet("pending")]
-    [Authorize(Policy = "Manager")]
-    public async Task<IActionResult> GetPending()
-    {
-        var managerId = GetUserIdFromContext();
-
-        var pending = await _context.Objectives
-            .Where(o => o.Status == ObjectiveStatus.PendingApproval
-                        && _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId))
+        var rejected = await _context.Objectives
+            .Where(o => o.UserId == userId && o.Status == ObjectiveStatus.Rejected)
             .ToListAsync();
 
-        return Ok(pending);
-    }
+        if (rejected.Count == 0)
+            return BadRequest(new { title = "You have no rejected objectives to resubmit" });
 
-    // POST api/objectives/5/approve
-    [HttpPost("{id}/approve")]
-    [Authorize(Policy = "Manager")]
-    public async Task<IActionResult> Approve(int id)
-    {
-        var managerId = GetUserIdFromContext();
-        var objective = await FindObjectiveOfMyTeam(id, managerId);
-
-        if (objective == null)
-            return NotFound();
-
-        if (objective.Status != ObjectiveStatus.PendingApproval)
-            return BadRequest(new { title = "Only objectives waiting for approval can be approved" });
-
-        objective.Status = ObjectiveStatus.Approved;
-        objective.ReviewedByUserId = managerId;
-        objective.RejectionReason = null;
-        objective.UpdatedAt = DateTime.UtcNow;
+        foreach (var objective in rejected)
+        {
+            objective.Status = ObjectiveStatus.PendingApproval;
+            objective.RejectionReason = null;
+            objective.UpdatedAt = DateTime.UtcNow;
+        }
 
         await _context.SaveChangesAsync();
-        return Ok(objective);
+        return Ok();
     }
 
-    // POST api/objectives/5/reject   body: { "reason": "..." }
-    [HttpPost("{id}/reject")]
-    [Authorize(Policy = "Manager")]
-    public async Task<IActionResult> Reject(int id, RejectObjectiveDto dto)
-    {
-        if (string.IsNullOrWhiteSpace(dto.Reason))
-            return BadRequest(new { title = "A rejection reason is required" });
-
-        var managerId = GetUserIdFromContext();
-        var objective = await FindObjectiveOfMyTeam(id, managerId);
-
-        if (objective == null)
-            return NotFound();
-
-        if (objective.Status != ObjectiveStatus.PendingApproval)
-            return BadRequest(new { title = "Only objectives waiting for approval can be rejected" });
-
-        objective.Status = ObjectiveStatus.Rejected;
-        objective.ReviewedByUserId = managerId;
-        objective.RejectionReason = dto.Reason.Trim();
-        objective.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-        return Ok(objective);
-    }
+    // GET api/objectives/team   (objectives of the employees who report to me)
     [HttpGet("team")]
     [Authorize(Policy = "Manager")]
     public async Task<IActionResult> GetTeam()
@@ -248,20 +161,78 @@ public class ObjectivesController : ControllerBase
         return Ok(list);
     }
 
-
-    // Finds an objective only if its owner reports to this manager
-    private async Task<Objective?> FindObjectiveOfMyTeam(int id, int managerId)
+    // POST api/objectives/team/5/approve
+    // The manager approves ALL pending objectives of one employee together.
+    [HttpPost("team/{userId:int}/approve")]
+    [Authorize(Policy = "Manager")]
+    public async Task<IActionResult> ApproveTeamMember(int userId)
     {
-        return await _context.Objectives.FirstOrDefaultAsync(o =>
-            o.Id == id &&
-            _context.Users.Any(u => u.Id == o.UserId && u.ManagerId == managerId));
-    }
-    private int GetUserIdFromContext() {
+        var managerId = GetUserIdFromContext();
+        if (!await IsInMyTeam(userId, managerId))
+            return NotFound(new { title = "This employee is not in your team" });
 
+        var pending = await _context.Objectives
+            .Where(o => o.UserId == userId && o.Status == ObjectiveStatus.PendingApproval)
+            .ToListAsync();
+
+        if (pending.Count == 0)
+            return BadRequest(new { title = "This employee has no objectives waiting for approval" });
+
+        foreach (var objective in pending)
+        {
+            objective.Status = ObjectiveStatus.Approved;
+            objective.RejectionReason = null;
+            objective.ReviewedByUserId = managerId;
+            objective.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    // POST api/objectives/team/5/reject   body: { "reason": "..." }
+    // The manager rejects ALL pending objectives of one employee together, with one reason.
+    [HttpPost("team/{userId:int}/reject")]
+    [Authorize(Policy = "Manager")]
+    public async Task<IActionResult> RejectTeamMember(int userId, RejectTeamMemberDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Reason))
+            return BadRequest(new { title = "Please write the reason for rejecting" });
+
+        var managerId = GetUserIdFromContext();
+        if (!await IsInMyTeam(userId, managerId))
+            return NotFound(new { title = "This employee is not in your team" });
+
+        var pending = await _context.Objectives
+            .Where(o => o.UserId == userId && o.Status == ObjectiveStatus.PendingApproval)
+            .ToListAsync();
+
+        if (pending.Count == 0)
+            return BadRequest(new { title = "This employee has no objectives waiting for approval" });
+
+        foreach (var objective in pending)
+        {
+            objective.Status = ObjectiveStatus.Rejected;
+            objective.RejectionReason = dto.Reason.Trim();
+            objective.ReviewedByUserId = managerId;
+            objective.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+    // Is this employee a direct, active report of the manager?
+    private async Task<bool> IsInMyTeam(int employeeId, int managerId)
+    {
+        return await _context.Users.AnyAsync(u =>
+            u.Id == employeeId && u.ManagerId == managerId && u.IsActive);
+    }
+
+    // Reads the claim "userId" from the JWT token of the current request
+    private int GetUserIdFromContext()
+    {
         var value = User.FindFirst("userId")?.Value;
         return int.TryParse(value, out var id) ? id : 0;
-    
     }
 }
-
-
