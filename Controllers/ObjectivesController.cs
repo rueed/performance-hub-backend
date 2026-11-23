@@ -13,16 +13,29 @@ public class ObjectivesController : ControllerBase
 {
     private readonly AppDbContext _context;//Dependency injection of the AppDbContext class, which is used to interact with the database. The _context variable is used to access the database and perform CRUD operations on the Objectives table.
 
-    public ObjectivesController(AppDbContext context)
+    private const int MaxObjectives = 3; // each employee can have at most 3 objectives
+    public ObjectivesController(AppDbContext context)// Dependency injection
     {
         _context = context;
+
     }
 
     [HttpPost]
     public async Task<IActionResult> Create(CreateObjectiveDto dto)
     {
-        
         var userId = GetUserIdFromContext();
+
+        // Rule 1: once something was submitted, no new objectives
+        var alreadySubmitted = await _context.Objectives
+            .AnyAsync(o => o.UserId == userId && o.Status != ObjectiveStatus.Draft);
+        if (alreadySubmitted)
+            return BadRequest(new { title = "You already submitted your objectives, so you cannot add new ones" });
+
+        // Rule 2: at most 3 objectives in total
+        var count = await _context.Objectives.CountAsync(o => o.UserId == userId);
+        if (count >= MaxObjectives)
+            return BadRequest(new { title = $"You can have at most {MaxObjectives} objectives" });
+
         var objective = new Objective
         {
             Title = dto.Title,
@@ -35,10 +48,35 @@ public class ObjectivesController : ControllerBase
         };
         _context.Objectives.Add(objective);
         await _context.SaveChangesAsync();
-        
 
         return Ok(objective);
-       
+    }
+
+    // PUT api/objectives/5   (edit a Draft or a Rejected objective)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, CreateObjectiveDto dto)
+    {
+        var userId = GetUserIdFromContext();
+
+        // only my own objective
+        var objective = await _context.Objectives
+            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
+
+        if (objective == null)
+            return NotFound();
+
+        if (objective.Status != ObjectiveStatus.Draft &&
+            objective.Status != ObjectiveStatus.Rejected)
+            return BadRequest(new { title = "Only Draft or Rejected objectives can be edited" });
+
+        objective.Title = dto.Title;
+        objective.Description = dto.Description;
+        objective.StartDate = dto.StartDate;
+        objective.EndDate = dto.EndDate;
+        objective.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(objective);
     }
 
     [HttpGet("mine")]
@@ -49,7 +87,7 @@ public class ObjectivesController : ControllerBase
         return Ok(objectives);
     }
     // POST api/objectives/5/submit
-    [HttpPost("{id}/submit")]
+    [HttpPost("{id}/submit")]//routing
     public async Task<IActionResult> Submit(int id)
     {
         var userId = GetUserIdFromContext();
