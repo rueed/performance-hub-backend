@@ -65,7 +65,7 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
+//requst pipeline;middleware sequence 
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
 // must come before UseAuthorization
